@@ -9,6 +9,9 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   // Le titre doit contenir les mots-clés principaux pour Google
   title: 'Souk El Had Agadir | Boutique Digitale & Guide Officiel',
+  alternates: {
+    canonical: 'https://www.soukelhadagadir.com', // FORCE GOOGLE À TOUT GROUPER ICI
+  },
   description: 'Le plus grand souk d\'Afrique à portée de clic. Localisez les meilleures boutiques de Souk El Had Agadir, découvrez les produits via Instagram et contactez les commerçants directement.',
   
   // URL de base pour éviter les erreurs de liens relatifs
