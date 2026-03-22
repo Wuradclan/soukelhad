@@ -5,10 +5,11 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const error = searchParams.get('error');
 
-  // --- 1. INITIALISATION ASYNCHRONE DE SUPABASE ---
-  // Dans Next.js 15+, cookies() doit être attendu avec 'await'
+  if (!code) {
+    return NextResponse.redirect(new URL('/user?error=no_code', request.url));
+  }
+
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -16,76 +17,74 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name: string, options: any) {
-          cookieStore.set({ name, value: '', ...options });
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch (error) {}
         },
       },
     }
   );
 
-  // --- 2. VÉRIFICATION DE L'IDENTITÉ ---
-  // On s'assure que c'est bien le commerçant connecté qui fait la demande
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (!user || userError) {
-    return NextResponse.redirect(new URL('/login?error=not_logged_in', request.url));
-  }
-
-  // --- 3. GESTION DES ERREURS META ---
-  if (error || !code) {
-    console.error('Erreur OAuth Meta:', searchParams.get('error_description'));
-    return NextResponse.redirect(new URL('/user?error=auth_failed', request.url));
-  }
-
   try {
-    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-    const appSecret = process.env.META_APP_SECRET;
-    const redirectUri = process.env.NEXT_PUBLIC_REDIRECT_URI;
+    // 1. Échange du code = Token Court
+    const shortLivedRes = await fetch(
+      `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${process.env.NEXT_PUBLIC_META_APP_ID}&redirect_uri=${process.env.NEXT_PUBLIC_META_REDIRECT_URI}&client_secret=${process.env.META_APP_SECRET}&code=${code}`
+    );
+    const shortLivedData = await shortLivedRes.json();
+    if (shortLivedData.error) throw new Error(shortLivedData.error.message);
+    const shortToken = shortLivedData.access_token;
 
-    // --- 4. ÉCHANGE DU CODE CONTRE UN TOKEN COURT (1h) ---
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${redirectUri}&client_secret=${appSecret}&code=${code}`;
+    // 2. Transformation = Token Long (60 jours)
+    const longLivedRes = await fetch(
+      `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.NEXT_PUBLIC_META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${shortToken}`
+    );
+    const longLivedData = await longLivedRes.json();
+    if (longLivedData.error) throw new Error(longLivedData.error.message);
+    const finalToken = longLivedData.access_token;
+
+    // 3. Récupération ID Business (Étape cruciale pour les photos)
+    const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${finalToken}`);
+    const pagesData = await pagesRes.json();
     
-    const tokenRes = await fetch(tokenUrl);
-    const tokenData = await tokenRes.json();
+    const pageId = pagesData.data[0]?.id;
+    if (!pageId) throw new Error("Aucune page Facebook trouvée.");
 
-    if (tokenData.error) throw new Error(tokenData.error.message);
-
-    // --- 5. ÉCHANGE CONTRE UN TOKEN LONGUE DURÉE (60 JOURS) ---
-    const longTokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${tokenData.access_token}`;
+    const igAccountRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=instagram_business_account&access_token=${finalToken}`);
+    const igAccountData = await igAccountRes.json();
     
-    const longTokenRes = await fetch(longTokenUrl);
-    const longTokenData = await longTokenRes.json();
+    const igBusinessId = igAccountData.instagram_business_account?.id;
+    if (!igBusinessId) throw new Error("Aucun compte Instagram Business lié à la page Facebook.");
 
-    if (longTokenData.error) throw new Error(longTokenData.error.message);
+    const igUserRes = await fetch(`https://graph.facebook.com/v19.0/${igBusinessId}?fields=username&access_token=${finalToken}`);
+    const igUserData = await igUserRes.json();
+    const igUsername = igUserData.username || null;
 
-    const finalAccessToken = longTokenData.access_token;
+    // 4. Sauvegarde Base de données
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utilisateur non connecté");
 
-    // --- 6. SAUVEGARDE DANS LA TABLE 'SHOPS' ---
-    // On enregistre le token pour la boutique liée à cet utilisateur
-    const { error: dbError } = await supabase
+    const { error: updateError } = await supabase
       .from('shops')
       .update({ 
-        ig_access_token: finalAccessToken,
-        updated_at: new Date().toISOString()
+        ig_access_token: finalToken,
+        ig_user_id: igBusinessId,
+        ig_username: igUsername,
+        ig_last_refreshed: new Date().toISOString()
       })
-      .eq('user_id', user.id); // On vérifie que c'est bien sa boutique
+      .eq('user_id', user.id);
 
-    if (dbError) {
-        console.error("Erreur Database:", dbError.message);
-        throw dbError;
-    }
+    if (updateError) throw updateError;
 
-    // --- 7. RETOUR AU DASHBOARD AVEC SUCCÈS ---
     return NextResponse.redirect(new URL('/user?success=instagram_connected', request.url));
 
-  } catch (err: any) {
-    console.error("Erreur critique d'intégration Instagram:", err.message);
-    return NextResponse.redirect(new URL('/user?error=auth_failed', request.url));
+  } catch (error: any) {
+    console.error('Erreur Callback:', error.message);
+    return NextResponse.redirect(new URL(`/user?error=auth_failed`, request.url));
   }
 }

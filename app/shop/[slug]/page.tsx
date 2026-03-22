@@ -1,111 +1,100 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import { MapPin, Store, Clock, Award, ChevronLeft } from 'lucide-react';
+import ProductGrid from '@/components/ProductGrid';
 
-// Correction Next.js 15 : params est maintenant une Promise
-export default async function ShopPage({ 
-  params 
-}: { 
-  params: Promise<{ slug: string }> 
-}) {
-  // 1. On attend la résolution du slug
-  const { slug } = await params;
-
-  // 2. Initialisation Supabase
+export default async function ShopPage(props: { params: Promise<{ slug: string }> }) {
+  const { slug } = await props.params;
   const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll() { return cookieStore.getAll(); } } });
 
-  // 3. Récupérer les infos de la boutique
-  const { data: shop, error } = await supabase
-    .from('shops')
-    .select('*')
-    .eq('slug', slug)
-    .single();
+  const { data: shop } = await supabase.from('shops').select('*').eq('slug', slug).single();
+  if (!shop || !shop.ig_access_token) return notFound();
 
-  // Si le slug ne correspond à rien dans la table 'shops', on lance la 404
-  if (error || !shop) {
-    console.error("Boutique non trouvée pour le slug :", slug);
-    return notFound();
-  }
-
-  // 4. Récupération Instagram (Optionnelle)
-  let instagramMedia = [];
-  if (shop.ig_access_token) {
-    try {
-      const res = await fetch(
-        `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,thumbnail_url,media_url,permalink&access_token=${shop.ig_access_token}`,
-        { next: { revalidate: 3600 } }
-      );
-      const data = await res.json();
-      if (data.data) instagramMedia = data.data;
-    } catch (e) {
-      console.log("Instagram non dispo pour le moment");
-    }
-  }
+  const res = await fetch(`https://graph.facebook.com/v19.0/${shop.ig_user_id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${shop.ig_access_token}&limit=40`);
+  const json = await res.json();
+  const photos = json.data || [];
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900">
-      {/* Header façon Souk Moderne */}
-      <header className="bg-orange-600 py-20 px-6 text-center text-white shadow-inner">
-        <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-4 drop-shadow-md">
-          {shop.name}
-        </h1>
-        <p className="text-orange-100 text-lg max-w-2xl mx-auto font-medium italic opacity-90">
-          {shop.description || "Commerçant authentique au cœur du Souk El Had d'Agadir."}
-        </p>
+    <div className="min-h-screen bg-white font-sans text-slate-900">
+      
+      {/* 1. HEADER IDENTIQUE À LA LANDING PAGE */}
+      <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-orange-500 font-bold text-xl tracking-tight italic">SoukElHad.ma</span>
+            <span className="text-gray-400 font-light text-sm hidden sm:block">/ سوق الأحد</span>
+          </Link>
+          
+          <div className="flex items-center gap-4">
+             <Link href="/signup" className="bg-orange-500 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-100">
+                S'inscrire
+             </Link>
+          </div>
+        </div>
       </header>
 
-      <main className="max-w-6xl mx-auto py-16 px-6">
-        <div className="flex items-center justify-between mb-10 border-b pb-4">
-          <h2 className="text-2xl font-black flex items-center gap-3">
-            <span className="bg-orange-100 p-2 rounded-lg text-xl">📸</span> 
-            Derniers Arrivages
-          </h2>
-          {shop.ig_access_token && (
-            <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 uppercase">
-              Live Instagram
-            </span>
-          )}
+      <main className="max-w-7xl mx-auto px-4 py-12 flex flex-col gap-16">
+        
+        {/* 2. SECTION PROFIL COMMERÇANT (Style Cartes Landing) */}
+        <section className="relative overflow-hidden bg-gray-50/50 border border-gray-100 rounded-[2.5rem] p-8 md:p-12 flex flex-col md:flex-row gap-12 items-center">
+            {/* Décoration en arrière-plan comme sur ta landing */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-100/30 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+
+            {/* Photo du stand */}
+            <div className="w-full md:w-1/3 aspect-square relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white">
+              {shop.photo_url ? (
+                <Image src={shop.photo_url} alt={shop.name} fill className="object-cover" />
+              ) : (
+                <div className="w-full h-full bg-orange-50 flex items-center justify-center text-orange-200">
+                  <Store size={80} strokeWidth={1} />
+                </div>
+              )}
+            </div>
+
+            {/* Détails */}
+            <div className="relative z-10 flex-grow text-center md:text-left">
+                <div className="inline-flex items-center gap-2 bg-white px-4 py-1.5 rounded-full border border-gray-100 shadow-sm mb-6">
+                    <Award size={14} className="text-orange-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Boutique Officielle</span>
+                </div>
+                
+                <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-6 tracking-tight uppercase italic leading-none">
+                    {shop.name}
+                </h1>
+
+                <div className="flex flex-wrap justify-center md:justify-start gap-4 text-sm font-bold text-gray-400 mb-8">
+                    <span className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-50 text-orange-600">
+                        <MapPin size={16} /> Box #{shop.box_number || "---"}
+                    </span>
+                    <span className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-50">
+                        <Clock size={16} /> 09h - 20h
+                    </span>
+                </div>
+
+                <p className="text-lg text-gray-500 max-w-2xl leading-relaxed italic">
+                    "{shop.description || "Retrouvez notre sélection exclusive d'articles en direct du Souk El Had d'Agadir. Qualité garantie et service client direct via WhatsApp."}"
+                </p>
+            </div>
+        </section>
+
+        {/* 3. GRILLE DE PRODUITS (Le composant client) */}
+        <div>
+           <div className="text-center mb-12">
+              <h2 className="text-3xl font-black mb-4">Nouveaux Arrivages</h2>
+              <div className="w-20 h-1.5 bg-orange-500 mx-auto rounded-full" />
+           </div>
+           
+           <ProductGrid photos={photos} shop={shop} />
         </div>
 
-        {/* Grille de photos ou Message d'attente */}
-        {instagramMedia.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {instagramMedia.map((media: any) => (
-              <a 
-                key={media.id} 
-                href={media.permalink} 
-                target="_blank" 
-                className="group relative aspect-square overflow-hidden rounded-3xl bg-gray-50 border border-gray-100 shadow-sm hover:shadow-2xl transition-all duration-300"
-              >
-                <img 
-                  src={media.media_url} 
-                  alt={media.caption || "Article du Souk"} 
-                  className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                   <p className="text-white text-xs font-medium truncate">{media.caption}</p>
-                </div>
-              </a>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-24 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
-            <div className="text-4xl mb-4">🏜️</div>
-            <p className="text-gray-400 font-bold text-lg">La vitrine est en cours de préparation.</p>
-            <p className="text-gray-300 text-sm mt-1 italic">Revenez bientôt pour voir nos nouveaux produits !</p>
-          </div>
-        )}
       </main>
 
-      <footer className="py-12 border-t border-gray-50 text-center">
-        <p className="text-gray-400 text-sm font-bold tracking-widest uppercase">
-          Souk El Had Digital • Agadir 2026
-        </p>
+      <footer className="py-20 text-center border-t border-gray-50">
+         <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.5em]">SoukElHad.ma — Agadir 2026</p>
       </footer>
     </div>
   );

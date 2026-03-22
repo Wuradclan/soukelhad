@@ -27,6 +27,7 @@ export const metadata: Metadata = {
     siteName: 'Souk El Had Digital',
     locale: 'fr_FR',
     type: 'website',
+    images: ['/images/og-image.jpg'],
   },
 
   // Pour Twitter/X (on ne sait jamais)
@@ -34,6 +35,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Souk El Had Agadir Digital',
     description: 'Le guide indispensable pour vos achats au Souk d\'Agadir.',
+    images: ['/images/og-image.jpg'],
   },
 
   icons: {

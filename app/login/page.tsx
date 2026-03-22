@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // N'oublie pas l'import du Link !
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -12,18 +13,18 @@ export default function LoginPage() {
   
   const router = useRouter();
 
-  // Initialisation du client Supabase
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      // ✅ CORRECTIF : Supabase est initialisé UNIQUEMENT quand on clique sur le bouton
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -47,7 +48,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100 p-4 font-sans">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-white">
         
-        {/* Header avec les couleurs du Souk d'Agadir */}
         <div className="bg-orange-600 p-8 text-center text-white">
           <h1 className="text-3xl font-black tracking-tight">Souk El Had</h1>
           <p className="text-orange-100 mt-2 font-medium opacity-90">Espace Commerçant</p>
@@ -56,7 +56,6 @@ export default function LoginPage() {
         <div className="p-8">
           <form onSubmit={handleLogin} className="space-y-5">
             
-            {/* Champ Email */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Email professionnel</label>
               <input 
@@ -69,7 +68,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Champ Mot de passe */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5 ml-1">Mot de passe</label>
               <input 
@@ -82,14 +80,12 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Message d'erreur visuel */}
             {error && (
               <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg border border-red-100 font-bold flex items-center gap-2">
                 <span>⚠️</span> {error}
               </div>
             )}
 
-            {/* Bouton de connexion */}
             <button 
               type="submit"
               disabled={loading}
@@ -98,6 +94,16 @@ export default function LoginPage() {
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
           </form>
+
+          {/* Lien vers l'inscription bien intégré */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-600 font-medium">
+              Vous n'avez pas encore de vitrine ?{' '}
+              <Link href="/signup" className="font-bold text-orange-600 hover:text-orange-500 transition-colors">
+                Créer mon compte
+              </Link>
+            </p>
+          </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-400">
