@@ -18,7 +18,11 @@ function normalizeRow(row: Record<string, unknown>): {
   return {
     date: ds,
     visits: Number(row.visits ?? row.visit_count ?? 0) || 0,
-    views: Number(row.views ?? row.view_count ?? 0) || 0,
+    // DB source of truth: `product_view_count` (legacy / RPC may still expose `views`)
+    views:
+      Number(
+        row.product_view_count ?? row.views ?? row.view_count ?? 0
+      ) || 0,
     waClicks: Number(row.wa_clicks ?? row.wa_click_count ?? 0) || 0,
   };
 }
@@ -45,7 +49,7 @@ function buildLast7Days(
 
 /**
  * Loads all `daily_stats` rows for a shop, sums lifetime totals, and builds a last-7-days series (zeros for missing days).
- * Expects columns: shop_id, stat_date (or date/day), visits, views, wa_clicks (names may vary slightly; see normalizeRow).
+ * Expects columns: shop_id, stat_date (or date/day), visits, product_view_count (or views), wa_clicks (see normalizeRow).
  */
 export async function getShopAnalytics(shopId: string): Promise<{
   totals: ActivityTotals;
