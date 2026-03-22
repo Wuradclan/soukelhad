@@ -8,13 +8,16 @@ import Link from 'next/link';
 async function signUpAction(formData: FormData) {
   'use server';
   
-  const email = formData.get('email') as string;
+  const email = (formData.get('email') as string).trim();
   const password = formData.get('password') as string;
-  const shopName = formData.get('shopName') as string;
+  const rawShopName = (formData.get('shopName') as string).trim();
 
   // 1. Validations
-  if (!email || !password || !shopName) {
+  if (!email || !password || !rawShopName) {
     redirect('/signup?error=Veuillez remplir tous les champs obligatoires.');
+  }
+  if (rawShopName.length < 2) {
+    redirect('/signup?error=Le nom de la boutique doit contenir au moins 2 caractères.');
   }
   if (password.length < 8) {
     redirect('/signup?error=Le mot de passe doit contenir au moins 8 caractères pour votre sécurité.');
@@ -62,18 +65,23 @@ async function signUpAction(formData: FormData) {
     );
 
     // Le commerçant tape "Bazar Al Anwar", le lien devient "bazar-al-anwar"
-    const slug = shopName
+    // Noms entièrement en arabe : slug vide après sanitisation → fallback unique
+    let slug = rawShopName
       .toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-      .replace(/[^a-z0-9]+/g, '-') 
-      .replace(/(^-|-$)+/g, ''); 
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    if (!slug) {
+      slug = `boutique-${authData.user.id.replace(/-/g, '').slice(0, 12)}`;
+    }
 
     const { error: shopError } = await supabaseAdmin
       .from('shops')
       .insert([
         {
           user_id: authData.user.id,
-          name: shopName,
+          name: rawShopName,
           slug: slug,
         }
       ]);
@@ -120,7 +128,7 @@ export default async function SignUpPage(props: {
             {/* NOM DE LA BOUTIQUE (Avec blocage de l'autofill) */}
             <div>
               <label htmlFor="shopName" className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                Nom de votre commerce au Souk
+                Nom de votre commerce au Souk — سمية البوتيك
               </label>
               <div className="mt-1">
                 <input
@@ -128,8 +136,9 @@ export default async function SignUpPage(props: {
                   name="shopName"
                   type="text"
                   required
+                  minLength={2}
                   autoComplete="off" /* LE BLOCAGE EST ICI */
-                  placeholder="Ex: Bazar Al Anwar"
+                  placeholder="Ex: Bazar Al Anwar ou بالعربية"
                   className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-xl shadow-sm placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-medium transition-all"
                 />
               </div>
