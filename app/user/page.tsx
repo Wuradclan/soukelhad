@@ -9,7 +9,9 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { getServerLocale } from '@/lib/locale-server';
 import { getMessage, type Locale } from '@/lib/translations';
 import { getShopAnalytics } from '@/lib/analytics-server';
+import { getShopPublicUrls } from '@/lib/site-url';
 import { AnalyticsChart } from '@/components/AnalyticsChart';
+import { ShareSuccessCardDownload } from '@/components/ShareSuccessCard';
 
 /**
  * ACTION SERVEUR 1 : Déconnexion complète d'Instagram
@@ -117,6 +119,16 @@ export default async function UserDashboard(props: {
     .maybeSingle();
 
   const analytics = shop?.id ? await getShopAnalytics(shop.id) : null;
+
+  const weeklyVisitors =
+    shop && analytics
+      ? analytics.last7Days.reduce((acc, d) => acc + d.visits, 0)
+      : 0;
+  const weeklyProductViews =
+    shop && analytics
+      ? analytics.last7Days.reduce((acc, d) => acc + d.views, 0)
+      : 0;
+  const shopPublicUrls = shop?.slug ? getShopPublicUrls(shop.slug) : null;
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col font-sans text-slate-900">
@@ -232,9 +244,30 @@ export default async function UserDashboard(props: {
               </div>
             </div>
 
-            <h3 className="text-sm font-black text-slate-800 mb-4">
-              {getMessage(locale, 'user.analyticsLast7Title')}
-            </h3>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-sm font-black text-slate-800">
+                {getMessage(locale, 'user.analyticsLast7Title')}
+              </h3>
+              {shop.slug && shopPublicUrls && (
+                <ShareSuccessCardDownload
+                  shopName={shop.name}
+                  slug={shop.slug}
+                  shopUrl={shopPublicUrls.href}
+                  displayUrl={shopPublicUrls.display}
+                  weeklyVisitors={weeklyVisitors}
+                  weeklyProductViews={weeklyProductViews}
+                  locale={locale}
+                  labels={{
+                    brand: getMessage(locale, 'user.shareSuccessBrand'),
+                    weeklyVisitors: getMessage(locale, 'user.shareSuccessWeeklyVisitors'),
+                    productViews: getMessage(locale, 'user.shareSuccessProductViews'),
+                    footerHint: getMessage(locale, 'user.shareSuccessFooterHint'),
+                  }}
+                  downloadLabel={getMessage(locale, 'user.shareSuccessDownload')}
+                  generatingLabel={getMessage(locale, 'user.shareSuccessGenerating')}
+                />
+              )}
+            </div>
             <AnalyticsChart
               data={analytics.last7Days}
               locale={locale}

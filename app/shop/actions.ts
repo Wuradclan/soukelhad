@@ -17,8 +17,8 @@ export async function trackActivity(shopId: string, activity: ActivityType) {
   );
 
   const { error } = await admin.rpc('track_activity', {
-    shop_id: shopId,
-    activity,
+    p_shop_id: shopId,
+    p_activity: activity,
   });
 
   if (error) {
