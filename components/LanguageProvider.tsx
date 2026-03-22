@@ -13,6 +13,7 @@ import {
   DEFAULT_LOCALE,
   LOCALE_COOKIE,
   type Locale,
+  formatMessageTemplate,
   getMessage,
   translations,
 } from '@/lib/translations'
@@ -20,7 +21,7 @@ import {
 export type LanguageContextValue = {
   locale: Locale
   setLocale: (loc: Locale) => void
-  t: (path: string) => string
+  t: (path: string, vars?: Record<string, string>) => string
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null)
@@ -61,7 +62,10 @@ export function LanguageProvider({
   }, [locale])
 
   const t = useCallback(
-    (path: string) => getMessage(locale, path),
+    (path: string, vars?: Record<string, string>) => {
+      const raw = getMessage(locale, path)
+      return vars ? formatMessageTemplate(raw, vars) : raw
+    },
     [locale]
   )
 
@@ -90,7 +94,10 @@ export function useTranslationOptional(): LanguageContextValue {
   return {
     locale: DEFAULT_LOCALE,
     setLocale: () => {},
-    t: (path: string) => getMessage(DEFAULT_LOCALE, path),
+    t: (path: string, vars?: Record<string, string>) => {
+      const raw = getMessage(DEFAULT_LOCALE, path)
+      return vars ? formatMessageTemplate(raw, vars) : raw
+    },
   }
 }
 

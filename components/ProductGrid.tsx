@@ -54,8 +54,18 @@ export default function ProductGrid({
     void trackActivity(shop.id, 'view');
   }, [selectedProduct?.id, shop?.id]);
 
-  const waText = (permalink: string) =>
-    `${t('productGrid.waMessagePrefix')} ${shop.name}: ${permalink}`
+  const waText = (permalink: string, caption: string | undefined) => {
+    const rawTitle = productTitleFromCaption(
+      caption,
+      t('productGrid.productFallback')
+    ).replace(/\*/g, '')
+    const productTitle = `*${rawTitle}*`
+    return t('productGrid.whatsappMessage', {
+      productTitle,
+      shopName: String(shop?.name ?? ''),
+      link: permalink,
+    })
+  }
 
   const modalTitle = selectedProduct
     ? productTitleFromCaption(selectedProduct.caption, t('productGrid.detailsFallback'))
@@ -196,7 +206,7 @@ export default function ProductGrid({
               </p>
 
               <a
-                href={`https://wa.me/${shop.whatsapp_number || '212600000000'}?text=${encodeURIComponent(waText(selectedProduct.permalink))}`}
+                href={`https://wa.me/${shop.whatsapp_number || '212600000000'}?text=${encodeURIComponent(waText(selectedProduct.permalink, selectedProduct.caption))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-auto flex items-center justify-center gap-3 w-full bg-orange-500 hover:bg-orange-600 text-white py-5 rounded-[1.5rem] font-bold text-lg transition-all shadow-xl shadow-orange-100 active:scale-95"

@@ -229,7 +229,8 @@ export const translations = {
       priceOnRequest: 'السعر عند الطلب',
       noDescription: 'لا يوجد وصف إضافي.',
       buyNow: 'اشترِ الآن',
-      waMessagePrefix: 'السلام! مهتم بهذا المنتج لدى',
+      whatsappMessage:
+        'السلام! أنا مهتم بـ {productTitle} عند {shopName} عبر soukelhad.ma: {link}',
     },
     instagramConnect: {
       configError: 'خطأ في الإعداد: متغيرات البيئة ناقصة.',
@@ -511,7 +512,8 @@ export const translations = {
       priceOnRequest: 'Prix sur demande',
       noDescription: 'Aucune description supplémentaire.',
       buyNow: 'Acheter maintenant',
-      waMessagePrefix: "Salam! Je suis intéressé par ce produit chez",
+      whatsappMessage:
+        'Salam! Je suis intéressé par {productTitle} chez {shopName} via soukelhad.ma: {link}',
     },
     instagramConnect: {
       configError: "Erreur de configuration : Variables d'environnement manquantes.",
@@ -584,6 +586,16 @@ export function getMessage(locale: Locale, path: string): string {
     }
   }
   return typeof value === 'string' ? value : path
+}
+
+/** Replace `{key}` placeholders in a template (used by `t(path, vars)` on the client). */
+export function formatMessageTemplate(
+  template: string,
+  vars: Record<string, string>
+): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? vars[key]! : `{${key}}`
+  )
 }
 
 /** Read locale from NEXT_LOCALE cookie (server). */
