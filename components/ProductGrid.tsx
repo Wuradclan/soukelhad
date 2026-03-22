@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { X, ShieldCheck, ShoppingCart } from 'lucide-react'
 import { useTranslation } from '@/components/LanguageProvider'
+import { buildProductGridWhatsAppMessage } from '@/lib/translations'
 import { trackActivity } from '@/app/shop/actions'
 
 function productTitleFromCaption(caption: string | undefined, fallback: string): string {
@@ -27,7 +28,7 @@ export default function ProductGrid({
   shop: any
   isDemoMode?: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const modalContentRef = useRef<HTMLDivElement>(null)
 
@@ -49,18 +50,22 @@ export default function ProductGrid({
     };
   }, [selectedProduct]);
 
-  useEffect(() => {
-    if (!selectedProduct?.id || !shop?.id) return;
-    void trackActivity(shop.id, 'view');
-  }, [selectedProduct?.id, shop?.id]);
+  /** Count a product view as soon as the user opens the modal (first line, before state update). */
+  function handleOpenProduct(photo: (typeof photos)[number]) {
+    if (shop?.id) {
+      void trackActivity(shop.id, 'view')
+    }
+    setSelectedProduct(photo)
+  }
 
+  /** Prefill uses `buildProductGridWhatsAppMessage` → `translations[locale].productGrid.whatsappMessage`. */
   const waText = (permalink: string, caption: string | undefined) => {
     const rawTitle = productTitleFromCaption(
       caption,
       t('productGrid.productFallback')
     ).replace(/\*/g, '')
     const productTitle = `*${rawTitle}*`
-    return t('productGrid.whatsappMessage', {
+    return buildProductGridWhatsAppMessage(locale, {
       productTitle,
       shopName: String(shop?.name ?? ''),
       link: permalink,
@@ -88,7 +93,7 @@ export default function ProductGrid({
           return (
             <div
               key={photo.id}
-              onClick={() => setSelectedProduct(photo)}
+              onClick={() => handleOpenProduct(photo)}
               className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden flex flex-col hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group cursor-pointer p-3"
             >
               <div className="relative aspect-square w-full bg-gray-50 overflow-hidden rounded-[1.5rem]">
@@ -129,99 +134,108 @@ export default function ProductGrid({
         })}
       </div>
 
-      {selectedProduct && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12 bg-gray-900/90 backdrop-blur-md animate-in fade-in duration-300">
+      {selectedProduct &&
+        (() => {
+          const whatsappUrl = `https://wa.me/${shop.whatsapp_number || '212600000000'}?text=${encodeURIComponent(
+            waText(selectedProduct.permalink, selectedProduct.caption)
+          )}`
 
-          <div
-            ref={modalContentRef}
-            className="relative bg-white w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row animate-in slide-in-from-bottom duration-300"
-          >
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12 bg-gray-900/90 backdrop-blur-md animate-in fade-in duration-300">
 
-            <button
-              onClick={() => setSelectedProduct(null)}
-              className="absolute top-4 end-4 z-[110] bg-gray-100 hover:bg-orange-500 hover:text-white text-gray-500 p-2 rounded-full transition-all"
-              type="button"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center h-[40vh] md:h-[85vh]">
-              {selectedProduct.media_type === 'VIDEO' ? (
-                <video
-                  src={selectedProduct.media_url}
-                  controls
-                  autoPlay
-                  loop
-                  className="max-h-full w-full object-contain"
-                  aria-label={modalImgAlt}
-                />
-              ) : (
-                <div className="relative w-full h-full p-4 md:p-8">
-                  <Image
-                    src={selectedProduct.media_url}
-                    alt={modalImgAlt}
-                    fill
-                    unoptimized={
-                      typeof selectedProduct.media_url === 'string' &&
-                      selectedProduct.media_url.endsWith('.svg')
-                    }
-                    className="object-contain"
-                    priority
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col justify-center">
-
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                  <ShieldCheck size={14} className="text-green-500 shrink-0" />
-                  <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">{t('productGrid.certified')}</span>
-                </div>
-                {isDemoMode && (
-                  <span className="inline-flex items-center rounded-full border border-amber-100 bg-amber-50/90 px-3 py-1.5 text-[9px] font-black uppercase tracking-wide text-amber-900/85">
-                    {t('productGrid.demoSyncBadge')}
-                  </span>
-                )}
-              </div>
-
-              <h2 className="text-xl md:text-2xl font-black text-gray-900 mb-3 leading-tight tracking-tight uppercase italic leading-none">
-                {modalTitle}
-              </h2>
-
-              <div className="flex items-center gap-3 mb-6">
-                {(() => {
-                  const p = selectedProduct.caption?.match(/(\d+)\s*(?:DH|Dhs|MAD)/i);
-                  return p ? (
-                    <div className="bg-orange-50 text-orange-600 px-5 py-2 rounded-full text-2xl font-black tracking-tighter shadow-sm border border-orange-100">
-                      {p[1]} DH
-                    </div>
-                  ) : <span className="text-gray-400 font-bold uppercase tracking-widest text-xs italic">{t('productGrid.priceOnRequest')}</span>
-                })()}
-              </div>
-
-              <p className="text-sm text-gray-500 leading-normal italic mb-8 border-s-4 border-orange-100 ps-4 py-1">
-                {selectedProduct.caption || t('productGrid.noDescription')}
-              </p>
-
-              <a
-                href={`https://wa.me/${shop.whatsapp_number || '212600000000'}?text=${encodeURIComponent(waText(selectedProduct.permalink, selectedProduct.caption))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-auto flex items-center justify-center gap-3 w-full bg-orange-500 hover:bg-orange-600 text-white py-5 rounded-[1.5rem] font-bold text-lg transition-all shadow-xl shadow-orange-100 active:scale-95"
-                onClick={() => {
-                  if (shop?.id) void trackActivity(shop.id, 'wa_click');
-                }}
+              <div
+                ref={modalContentRef}
+                className="relative bg-white w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row animate-in slide-in-from-bottom duration-300"
               >
-                <ShoppingCart size={18} className="shrink-0" />
-                <span className="font-bold">{t('productGrid.buyNow')}</span>
-              </a>
 
+                <button
+                  onClick={() => setSelectedProduct(null)}
+                  className="absolute top-4 end-4 z-[110] bg-gray-100 hover:bg-orange-500 hover:text-white text-gray-500 p-2 rounded-full transition-all"
+                  type="button"
+                >
+                  <X size={20} />
+                </button>
+
+                <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center h-[40vh] md:h-[85vh]">
+                  {selectedProduct.media_type === 'VIDEO' ? (
+                    <video
+                      src={selectedProduct.media_url}
+                      controls
+                      autoPlay
+                      loop
+                      className="max-h-full w-full object-contain"
+                      aria-label={modalImgAlt}
+                    />
+                  ) : (
+                    <div className="relative w-full h-full p-4 md:p-8">
+                      <Image
+                        src={selectedProduct.media_url}
+                        alt={modalImgAlt}
+                        fill
+                        unoptimized={
+                          typeof selectedProduct.media_url === 'string' &&
+                          selectedProduct.media_url.endsWith('.svg')
+                        }
+                        className="object-contain"
+                        priority
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col justify-center">
+
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                      <ShieldCheck size={14} className="text-green-500 shrink-0" />
+                      <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">{t('productGrid.certified')}</span>
+                    </div>
+                    {isDemoMode && (
+                      <span className="inline-flex items-center rounded-full border border-amber-100 bg-amber-50/90 px-3 py-1.5 text-[9px] font-black uppercase tracking-wide text-amber-900/85">
+                        {t('productGrid.demoSyncBadge')}
+                      </span>
+                    )}
+                  </div>
+
+                  <h2 className="text-xl md:text-2xl font-black text-gray-900 mb-3 leading-tight tracking-tight uppercase italic leading-none">
+                    {modalTitle}
+                  </h2>
+
+                  <div className="flex items-center gap-3 mb-6">
+                    {(() => {
+                      const p = selectedProduct.caption?.match(/(\d+)\s*(?:DH|Dhs|MAD)/i);
+                      return p ? (
+                        <div className="bg-orange-50 text-orange-600 px-5 py-2 rounded-full text-2xl font-black tracking-tighter shadow-sm border border-orange-100">
+                          {p[1]} DH
+                        </div>
+                      ) : <span className="text-gray-400 font-bold uppercase tracking-widest text-xs italic">{t('productGrid.priceOnRequest')}</span>
+                    })()}
+                  </div>
+
+                  <p className="text-sm text-gray-500 leading-normal italic mb-8 border-s-4 border-orange-100 ps-4 py-1">
+                    {selectedProduct.caption || t('productGrid.noDescription')}
+                  </p>
+
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-auto flex items-center justify-center gap-3 w-full bg-orange-500 hover:bg-orange-600 text-white py-5 rounded-[1.5rem] font-bold text-lg transition-all shadow-xl shadow-orange-100 active:scale-95"
+                    onClick={() => {
+                      if (!shop?.id) return
+                      void trackActivity(shop.id, 'view')
+                      void trackActivity(shop.id, 'wa_click')
+                    }}
+                  >
+                    <ShoppingCart size={18} className="shrink-0" />
+                    <span className="font-bold">{t('productGrid.buyNow')}</span>
+                  </a>
+
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )
+        })()}
     </>
   )
 }

@@ -598,6 +598,17 @@ export function formatMessageTemplate(
   )
 }
 
+/** Single source of truth for the shop product → WhatsApp prefill template (must match `translations.*.productGrid`). */
+export const PRODUCT_GRID_WHATSAPP_MESSAGE_KEY = 'productGrid.whatsappMessage' as const
+
+export function buildProductGridWhatsAppMessage(
+  locale: Locale,
+  vars: { productTitle: string; shopName: string; link: string }
+): string {
+  const template = getMessage(locale, PRODUCT_GRID_WHATSAPP_MESSAGE_KEY)
+  return formatMessageTemplate(template, vars)
+}
+
 /** Read locale from NEXT_LOCALE cookie (server). */
 export function localeFromCookie(cookieValue: string | undefined): Locale {
   return cookieValue === 'ar' ? 'ar' : 'fr'

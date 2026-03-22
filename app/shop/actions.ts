@@ -23,5 +23,10 @@ export async function trackActivity(shopId: string, activity: ActivityType) {
 
   if (error) {
     console.error('trackActivity: rpc failed', error.message, { shopId, activity });
+    return;
+  }
+
+  if (process.env.NODE_ENV === 'development' && activity === 'view') {
+    console.log('[trackActivity] view sent to Supabase', { shopId });
   }
 }
