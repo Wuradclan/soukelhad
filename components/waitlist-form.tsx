@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
+import { useTranslation } from "@/components/LanguageProvider"
 
 export function WaitlistForm() {
+  const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,12 +36,12 @@ export function WaitlistForm() {
 
       if (!response.ok) {
         const result = await response.json()
-        throw new Error(result.error || "Erreur lors de l'inscription")
+        throw new Error(result.error || t("waitlist.errorSubmit"))
       }
 
       setIsSubmitted(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur lors de l'inscription")
+      setError(err instanceof Error ? err.message : t("waitlist.errorSubmit"))
     } finally {
       setIsSubmitting(false)
     }
@@ -51,10 +53,10 @@ export function WaitlistForm() {
         <Card className="shadow-2xl border-0">
           <CardHeader className="text-center pb-6">
             <CardTitle className="text-2xl sm:text-3xl font-bold">
-              Prenez de l'avance
+              {t("waitlist.title")}
             </CardTitle>
             <CardDescription className="text-base mt-2">
-              Inscrivez-vous pour être parmi les premiers marchands certifiés.
+              {t("waitlist.description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -75,9 +77,9 @@ export function WaitlistForm() {
                     />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Merci pour votre inscription!</h3>
+                <h3 className="text-xl font-semibold mb-2">{t("waitlist.thankYou")}</h3>
                 <p className="text-muted-foreground">
-                  Nous vous contacterons bientôt sur WhatsApp.
+                  {t("waitlist.followUp")}
                 </p>
               </div>
             ) : (
@@ -89,12 +91,12 @@ export function WaitlistForm() {
                 )}
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="name">Nom complet</FieldLabel>
+                    <FieldLabel htmlFor="name">{t("waitlist.nameLabel")}</FieldLabel>
                     <Input
                       id="name"
                       name="name"
                       type="text"
-                      placeholder="Ex: Hassan Alami"
+                      placeholder={t("waitlist.namePlaceholder")}
                       required
                     />
                   </Field>
@@ -102,12 +104,12 @@ export function WaitlistForm() {
 
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="local">Numéro du Local & Porte (Bab)</FieldLabel>
+                    <FieldLabel htmlFor="local">{t("waitlist.localLabel")}</FieldLabel>
                     <Input
                       id="local"
                       name="local"
                       type="text"
-                      placeholder="Ex: Local 145, Bab 6"
+                      placeholder={t("waitlist.localPlaceholder")}
                       required
                     />
                   </Field>
@@ -115,12 +117,12 @@ export function WaitlistForm() {
 
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="whatsapp">Numéro WhatsApp</FieldLabel>
+                    <FieldLabel htmlFor="whatsapp">{t("waitlist.whatsappLabel")}</FieldLabel>
                     <Input
                       id="whatsapp"
                       name="whatsapp"
                       type="tel"
-                      placeholder="Ex: 06 00 00 00 00"
+                      placeholder={t("waitlist.whatsappPlaceholder")}
                       required
                     />
                   </Field>
@@ -128,12 +130,12 @@ export function WaitlistForm() {
 
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="instagram">Nom d'utilisateur Instagram</FieldLabel>
+                    <FieldLabel htmlFor="instagram">{t("waitlist.instagramLabel")}</FieldLabel>
                     <Input
                       id="instagram"
                       name="instagram"
                       type="text"
-                      placeholder="Ex: @MaBoutiqueAgadir"
+                      placeholder={t("waitlist.instagramPlaceholder")}
                       required
                     />
                   </Field>
@@ -147,11 +149,11 @@ export function WaitlistForm() {
                 >
                   {isSubmitting ? (
                     <>
-                      <Spinner className="mr-2" />
-                      Inscription en cours...
+                      <Spinner className="me-2" />
+                      {t("waitlist.submitting")}
                     </>
                   ) : (
-                    "Rejoindre la liste d'attente"
+                    t("waitlist.submit")
                   )}
                 </Button>
               </form>

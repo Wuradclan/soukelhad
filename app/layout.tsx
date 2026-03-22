@@ -1,62 +1,71 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { cookies } from 'next/headers'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { Providers } from '@/components/Providers'
+import {
+  LOCALE_COOKIE,
+  localeFromCookie,
+  translations,
+  type Locale,
+} from '@/lib/translations'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+export async function generateMetadata(): Promise<Metadata> {
+  const store = await cookies()
+  const locale: Locale = localeFromCookie(store.get(LOCALE_COOKIE)?.value)
+  const m = translations[locale].metadata
 
-export const metadata: Metadata = {
-  // Le titre doit contenir les mots-clés principaux pour Google
-  title: 'Souk El Had Agadir | Boutique Digitale & Guide Officiel',
-  alternates: {
-    canonical: 'https://www.soukelhadagadir.com', // FORCE GOOGLE À TOUT GROUPER ICI
-  },
-  description: 'Le plus grand souk d\'Afrique à portée de clic. Localisez les meilleures boutiques de Souk El Had Agadir, découvrez les produits via Instagram et contactez les commerçants directement.',
-  
-  // URL de base pour éviter les erreurs de liens relatifs
-  metadataBase: new URL('https://www.soukelhadagadir.com'),
-  
-  keywords: ['Souk El Had', 'Agadir', 'Maroc', 'Shopping Agadir', 'Artisanat Marocain', 'Boutique Souk Agadir', 'Guide Touristique Agadir'],
-  
-  // Configuration pour le partage sur les réseaux (WhatsApp, Facebook, Instagram)
-  openGraph: {
-    title: 'Souk El Had Agadir - Votre Guide Shopping Numérique',
-    description: 'Explorez le Souk El Had comme jamais auparavant. Artisanat, mode, et produits locaux en direct d\'Agadir.',
-    url: 'https://www.soukelhadagadir.com',
-    siteName: 'Souk El Had Digital',
-    locale: 'fr_FR',
-    type: 'website',
-    images: ['/images/og-image.jpg'],
-  },
-
-  // Pour Twitter/X (on ne sait jamais)
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Souk El Had Agadir Digital',
-    description: 'Le guide indispensable pour vos achats au Souk d\'Agadir.',
-    images: ['/images/og-image.jpg'],
-  },
-
-  icons: {
-    icon: [
-      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-      { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
-    apple: '/apple-icon.png',
-  },
+  return {
+    title: m.title,
+    alternates: {
+      canonical: 'https://www.soukelhadagadir.com',
+    },
+    description: m.description,
+    metadataBase: new URL('https://www.soukelhadagadir.com'),
+    keywords: [...m.keywords],
+    openGraph: {
+      title: m.ogTitle,
+      description: m.ogDescription,
+      url: 'https://www.soukelhadagadir.com',
+      siteName: 'Souk El Had Digital',
+      locale: locale === 'ar' ? 'ar_MA' : 'fr_FR',
+      type: 'website',
+      images: ['/images/og-image.jpg'],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: m.twitterTitle,
+      description: m.twitterDescription,
+      images: ['/images/og-image.jpg'],
+    },
+    icons: {
+      icon: [
+        { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
+        { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
+        { url: '/icon.svg', type: 'image/svg+xml' },
+      ],
+      apple: '/apple-icon.png',
+    },
+  }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const store = await cookies()
+  const initialLocale: Locale = localeFromCookie(store.get(LOCALE_COOKIE)?.value)
+
   return (
-    <html lang="fr" className="scroll-smooth">
-      <body className={`${_geist.className} antialiased`}>
-        {children}
+    <html
+      lang={initialLocale}
+      dir={initialLocale === 'ar' ? 'rtl' : 'ltr'}
+      className="scroll-smooth"
+      suppressHydrationWarning
+    >
+      <body className="bg-background text-foreground">
+        <Providers initialLocale={initialLocale}>{children}</Providers>
         <Analytics />
       </body>
     </html>

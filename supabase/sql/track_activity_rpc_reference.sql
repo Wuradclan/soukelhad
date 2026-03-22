@@ -1,0 +1,36 @@
+-- Reference: RPC expected by `trackActivity` in app/shop/actions.ts
+-- Params (PostgREST / Supabase JS): { shop_id: uuid, activity: text }
+-- Values for activity: 'visit' | 'view' | 'wa_click'
+--
+-- If your function already exists in Supabase, ensure the argument names match
+-- (rename `activity` below if your second parameter is e.g. `activity_type`).
+
+/*
+CREATE OR REPLACE FUNCTION public.track_activity(shop_id uuid, activity text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  d date := (timezone('utc', now()))::date;
+  v int := 0;
+  w int := 0;
+  c int := 0;
+BEGIN
+  IF activity = 'visit' THEN v := 1; END IF;
+  IF activity = 'view' THEN w := 1; END IF;
+  IF activity = 'wa_click' THEN c := 1; END IF;
+
+  INSERT INTO public.daily_stats (shop_id, stat_date, visits, views, wa_clicks)
+  VALUES (shop_id, d, v, w, c)
+  ON CONFLICT (shop_id, stat_date) DO UPDATE SET
+    visits = public.daily_stats.visits + EXCLUDED.visits,
+    views = public.daily_stats.views + EXCLUDED.views,
+    wa_clicks = public.daily_stats.wa_clicks + EXCLUDED.wa_clicks;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.track_activity(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.track_activity(uuid, text) TO service_role;
+*/

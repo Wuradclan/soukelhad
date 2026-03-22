@@ -1,7 +1,7 @@
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react'
+import { getServerLocale } from '@/lib/locale-server'
+import { getMessage } from '@/lib/translations'
 
-
-// Composant SVG personnalisé pour Instagram (évite l'erreur 'deprecated' de Lucide)
 const InstagramIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -22,49 +22,51 @@ const InstagramIcon = ({ className }: { className?: string }) => (
 )
 
 async function getInstagramPosts() {
-  const IG_ACCOUNT_ID = process.env.IG_ACCOUNT_ID;
-  const TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-  
-  if (!IG_ACCOUNT_ID || !TOKEN) return [];
+  const IG_ACCOUNT_ID = process.env.IG_ACCOUNT_ID
+  const TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN
 
-  const url = `https://graph.facebook.com/v19.0/${IG_ACCOUNT_ID}/media?fields=id,caption,media_url,permalink,timestamp,media_type&access_token=${TOKEN}&limit=6`;
+  if (!IG_ACCOUNT_ID || !TOKEN) return []
+
+  const url = `https://graph.facebook.com/v19.0/${IG_ACCOUNT_ID}/media?fields=id,caption,media_url,permalink,timestamp,media_type&access_token=${TOKEN}&limit=6`
 
   try {
-    const res = await fetch(url, { next: { revalidate: 3600 } });
-    const data = await res.json();
-    return data.data || [];
+    const res = await fetch(url, { next: { revalidate: 3600 } })
+    const data = await res.json()
+    return data.data || []
   } catch (error) {
-    console.error("Erreur Instagram:", error);
-    return [];
+    const locale = await getServerLocale()
+    console.error(getMessage(locale, 'instagramFeed.consoleError'), error)
+    return []
   }
 }
 
 export async function InstagramFeed() {
-  const posts = await getInstagramPosts();
+  const posts = await getInstagramPosts()
+  const locale = await getServerLocale()
 
   return (
     <section className="py-16 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-orange-600 mb-2">
-            En direct de Souk El Had
+            {getMessage(locale, 'instagramFeed.title')}
           </h2>
-          <p className="text-gray-600">Suivez nos dernières pépites sur Instagram</p>
+          <p className="text-gray-600">{getMessage(locale, 'instagramFeed.subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {posts.length > 0 ? (
-            posts.map((post: any) => (
-              <a 
-                key={post.id} 
-                href={post.permalink} 
-                target="_blank" 
+            posts.map((post: { id: string; permalink: string; media_url: string; caption?: string }) => (
+              <a
+                key={post.id}
+                href={post.permalink}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="group relative aspect-square overflow-hidden rounded-xl bg-gray-200"
               >
-                <img 
-                  src={post.media_url} 
-                  alt={post.caption || "Post Instagram"} 
+                <img
+                  src={post.media_url}
+                  alt={post.caption || getMessage(locale, 'instagramFeed.postAlt')}
                   className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -80,14 +82,14 @@ export async function InstagramFeed() {
         </div>
 
         <div className="mt-10 text-center">
-          <a 
-            href="https://instagram.com/soukelhad.ma" 
+          <a
+            href="https://instagram.com/soukelhad.ma"
             className="inline-flex items-center gap-2 px-6 py-3 border-2 border-orange-600 text-orange-600 font-bold rounded-full hover:bg-orange-600 hover:text-white transition-colors"
           >
-            Suivre @soukelhad.ma <ExternalLink size={18} />
+            {getMessage(locale, 'instagramFeed.follow')} <ExternalLink size={18} className="shrink-0" />
           </a>
         </div>
       </div>
     </section>
-  );
+  )
 }
