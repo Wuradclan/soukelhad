@@ -1,3 +1,6 @@
+-- ARCHIVED: waitlist UI and /api/waitlist were removed (merchant onboarding is live).
+-- Kept for reference if the `waitlist` table still exists in your project.
+
 -- Create waitlist table for storing form submissions
 CREATE TABLE IF NOT EXISTS waitlist (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

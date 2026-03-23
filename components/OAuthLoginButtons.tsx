@@ -39,11 +39,6 @@ export function OAuthLoginButtons() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState<'google' | 'facebook' | null>(null);
 
-  const redirectTo = () => {
-    if (typeof window === 'undefined') return '';
-    return `${window.location.origin}/auth/callback?next=${encodeURIComponent('/user')}`;
-  };
-
   const signIn = async (provider: 'google' | 'facebook') => {
     setLoading(provider);
     try {
@@ -51,10 +46,14 @@ export function OAuthLoginButtons() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
+      const redirectTo =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback`
+          : '';
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: redirectTo(),
+          redirectTo,
           skipBrowserRedirect: false,
         },
       });

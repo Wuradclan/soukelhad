@@ -1,16 +1,18 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useTranslation } from "@/components/LanguageProvider"
+import { useSupabaseSession } from "@/hooks/use-supabase-session"
 
 export function Hero() {
   const { t } = useTranslation()
+  const { isLoggedIn, loading } = useSupabaseSession()
 
-  const scrollToForm = () => {
-    document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" })
-  }
+  const ctaHref = isLoggedIn ? "/user" : "/login"
+  const ctaLabel = isLoggedIn ? t("hero.ctaDashboard") : t("hero.ctaStartShop")
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
@@ -42,9 +44,16 @@ export function Hero() {
           {t("hero.subtitle")}
         </p>
 
-        <Button size="lg" onClick={scrollToForm} className="text-lg px-8 py-6 h-auto shadow-xl hover:scale-105 transition-transform">
-          {t("hero.cta")}
-        </Button>
+        {loading ? (
+          <div
+            className="mx-auto h-14 max-w-xs rounded-lg bg-white/10 animate-pulse"
+            aria-hidden
+          />
+        ) : (
+          <Button size="lg" asChild className="text-lg px-8 py-6 h-auto shadow-xl hover:scale-105 transition-transform">
+            <Link href={ctaHref}>{ctaLabel}</Link>
+          </Button>
+        )}
       </div>
     </section>
   )

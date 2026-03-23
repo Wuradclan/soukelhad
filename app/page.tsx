@@ -2,7 +2,6 @@ import { Navbar } from "@/components/navbar"
 import { Hero } from "@/components/hero"
 import { Features } from "@/components/features"
 import { InstagramFeed } from "@/components/instagram-feed" // Ton flux dynamique
-import { WaitlistForm } from "@/components/waitlist-form"
 import { Footer } from "@/components/footer"
 
 // Ajoute ceci pour que la page (surtout le flux Insta) soit rapide et mise en cache !
@@ -19,7 +18,6 @@ export default function Home() {
       <Hero />
       <Features />
       <InstagramFeed />
-      <WaitlistForm />
       <Footer />
     </main>
   )
