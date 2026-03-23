@@ -103,6 +103,25 @@ export const translations = {
       noAccount: 'ليس لديك واجهة بعد؟',
       createAccount: 'إنشاء حساب',
       copyright: 'سوق الأحد أكادير © 2026 — منصة التجار',
+      oauthDivider: 'أو باستخدام',
+      oauthDividerEmail: 'عبر البريد وكلمة المرور',
+      oauthGoogle: 'جوجل',
+      oauthFacebook: 'فيسبوك',
+      oauthRedirecting: 'جاري التحويل…',
+      oauthError: 'تعذّر بدء تسجيل الدخول. تحقق من إعدادات المزود في Supabase.',
+      oauthCallbackError: 'فشل تسجيل الدخول. أعد المحاولة.',
+    },
+    completeProfile: {
+      title: 'أكمل ملفك',
+      subtitle: 'أدخل رقم واتساب المهني لاستقبال طلبات الزبناء.',
+      whatsappLabel: 'رقم واتساب',
+      whatsappPlaceholder: '06 12 34 56 78 أو +212 612 345 678',
+      submit: 'حفظ ومتابعة',
+      submitting: 'جاري الحفظ…',
+      errorRequired: 'رقم واتساب إلزامي.',
+      errorSave: 'تعذّر الحفظ. أعد المحاولة.',
+      errorServer: 'إعداد الخادم ناقص. أبلغ الفريق.',
+      errorNoShop: 'لم يُعثر على محلك. تواصل مع الدعم أو أعد تسجيل الدخول.',
     },
     signup: {
       errors: {
@@ -382,6 +401,27 @@ export const translations = {
       noAccount: "Vous n'avez pas encore de vitrine ?",
       createAccount: 'Créer mon compte',
       copyright: 'Souk El Had Agadir © 2026 - Plateforme Commerçants',
+      oauthDivider: 'Ou continuer avec',
+      oauthDividerEmail: 'E-mail et mot de passe',
+      oauthGoogle: 'Google',
+      oauthFacebook: 'Facebook',
+      oauthRedirecting: 'Redirection…',
+      oauthError: 'Connexion impossible. Vérifiez Google/Facebook dans Supabase (Auth → Providers).',
+      oauthCallbackError: 'Connexion échouée. Réessayez.',
+    },
+    completeProfile: {
+      title: 'Complétez votre profil',
+      subtitle:
+        'Indiquez votre numéro WhatsApp professionnel pour recevoir les commandes.',
+      whatsappLabel: 'Numéro WhatsApp',
+      whatsappPlaceholder: '06 12 34 56 78 ou +212 612 345 678',
+      submit: 'Enregistrer et continuer',
+      submitting: 'Enregistrement…',
+      errorRequired: 'Le numéro WhatsApp est obligatoire.',
+      errorSave: 'Enregistrement impossible. Réessayez.',
+      errorServer: 'Configuration serveur incomplète. Contactez le support.',
+      errorNoShop:
+        'Boutique introuvable. Contactez le support ou reconnectez-vous.',
     },
     signup: {
       errors: {

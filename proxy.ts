@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { publicSupabaseAnonKey, publicSupabaseUrl } from '@/lib/env'
 
 // IMPORTANT : Le nom de la fonction doit être "proxy" ou un "export default"
 export async function proxy(request: NextRequest) {
@@ -11,8 +12,8 @@ export async function proxy(request: NextRequest) {
 
   // 1. Initialisation Supabase (Standard pour Next.js 15/16)
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    publicSupabaseUrl(),
+    publicSupabaseAnonKey(),
     {
       cookies: {
         get(name: string) {

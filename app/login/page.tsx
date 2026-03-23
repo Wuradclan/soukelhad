@@ -1,11 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslation } from '@/components/LanguageProvider';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { OAuthLoginButtons } from '@/components/OAuthLoginButtons';
+
+function LoginFormWithOAuthError() {
+  const { t } = useTranslation();
+  const searchParams = useSearchParams();
+  const oauthFail = searchParams.get('error');
+
+  return (
+    <>
+      {oauthFail === 'oauth' && (
+        <div className="mb-4 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">
+          {t('login.oauthCallbackError')}
+        </div>
+      )}
+
+      <OAuthLoginButtons />
+
+      <div className="relative my-8">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-200" />
+        </div>
+        <div className="relative flex justify-center text-xs font-bold uppercase tracking-widest">
+          <span className="bg-white px-3 text-gray-400">{t('login.oauthDividerEmail')}</span>
+        </div>
+      </div>
+    </>
+  );
+}
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -58,6 +86,10 @@ export default function LoginPage() {
         </div>
 
         <div className="p-8">
+          <Suspense fallback={null}>
+            <LoginFormWithOAuthError />
+          </Suspense>
+
           <form onSubmit={handleLogin} className="space-y-5">
 
             <div>

@@ -2,37 +2,109 @@
 
 import React from 'react';
 import { useTranslation } from '@/components/LanguageProvider';
+import {
+  metaAppId,
+  resolveInstagramRedirectUriClient,
+} from '@/lib/env';
+
+/** Keys relevant to Instagram OAuth + Supabase (for debugging "missing env" alerts). */
+function logInstagramEnvCheck(context: string) {
+  const payload = {
+    NEXT_PUBLIC_META_APP_ID: !!process.env.NEXT_PUBLIC_META_APP_ID?.trim(),
+    NEXT_PUBLIC_META_REDIRECT_URI: !!process.env.NEXT_PUBLIC_META_REDIRECT_URI?.trim(),
+    NEXT_PUBLIC_REDIRECT_URI: !!process.env.NEXT_PUBLIC_REDIRECT_URI?.trim(),
+    NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim(),
+    SUPABASE_URL: !!process.env.SUPABASE_URL?.trim(),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim(),
+    SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY?.trim(),
+  };
+  console.log(`[InstagramConnect] CHECKING ${context}:`, payload);
+}
+
+/**
+ * Facebook Login for Instagram API — manual OAuth URL (not Supabase signInWithOAuth).
+ * Mirrors Meta’s recommended query params: reauthenticate + popup + fresh state each run.
+ */
+export function signInWithInstagram(onConfigError: () => void): void {
+  logInstagramEnvCheck('signInWithInstagram');
+
+  const appId = metaAppId();
+  const { uri: redirectUri, usedOriginFallback } =
+    resolveInstagramRedirectUriClient();
+
+  console.log('[InstagramConnect] RESOLVED:', {
+    appId: !!appId,
+    redirectUri: !!redirectUri,
+    usedOriginFallback,
+    redirectUriPreview: redirectUri
+      ? `${redirectUri.slice(0, 48)}${redirectUri.length > 48 ? '…' : ''}`
+      : '(empty)',
+  });
+
+  if (!appId || !redirectUri) {
+    console.error(
+      '[InstagramConnect] Missing Meta OAuth config. Need NEXT_PUBLIC_META_APP_ID and a redirect URI (NEXT_PUBLIC_META_REDIRECT_URI or NEXT_PUBLIC_REDIRECT_URI, or browser origin fallback).'
+    );
+    onConfigError();
+    return;
+  }
+
+  if (usedOriginFallback) {
+    console.warn(
+      '[InstagramConnect] Using redirect URI from current origin. Add this exact URL to Meta → Valid OAuth Redirect URIs:',
+      redirectUri
+    );
+  }
+
+  const scope = [
+    'instagram_basic',
+    'instagram_manage_insights',
+    'pages_show_list',
+    'pages_read_engagement',
+    'business_management',
+  ].join(',');
+
+  // Fresh OAuth: new state on every click (CSRF + avoids stale dialog cache).
+  const state =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? `ig-${crypto.randomUUID()}`
+      : `ig-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const params = new URLSearchParams({
+    client_id: appId,
+    redirect_uri: redirectUri,
+    scope,
+    response_type: 'code',
+    // Same intent as signInWithOAuth queryParams for Facebook: force password / Switch account
+    auth_type: 'reauthenticate',
+    display: 'popup',
+    state,
+  });
+
+  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+
+  // Best-effort: avoid reusing any in-tab FB session hints before full navigation.
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('fb_sso_status');
+    }
+  } catch {
+    /* ignore */
+  }
+
+  window.location.assign(authUrl);
+}
 
 export default function InstagramConnectButton() {
   const { t } = useTranslation();
-  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-  const redirectUri = process.env.NEXT_PUBLIC_META_REDIRECT_URI;
-
-  const handleConnect = () => {
-    if (!appId || !redirectUri) {
-      console.error('Meta env missing');
-      alert(t('instagramConnect.configError'));
-      return;
-    }
-
-    const scope = [
-      'instagram_basic',
-      'instagram_manage_insights',
-      'pages_show_list',
-      'pages_read_engagement',
-      'business_management'
-    ].join(',');
-
-    const encodedRedirect = encodeURIComponent(redirectUri);
-
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodedRedirect}&scope=${scope}&response_type=code&auth_type=rerequest`;
-
-    window.location.href = authUrl;
-  };
 
   return (
     <button
-      onClick={handleConnect}
+      onClick={() =>
+        signInWithInstagram(() => alert(t('instagramConnect.configError')))
+      }
       type="button"
       className="group relative inline-flex items-center justify-center px-8 py-4 font-black text-white transition-all duration-300 bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] rounded-2xl hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl overflow-hidden"
     >

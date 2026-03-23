@@ -9,10 +9,7 @@ import {
   localeFromCookie,
 } from '@/lib/translations';
 import { parseMoroccanWhatsApp } from '@/lib/phone';
-import {
-  ensureUniqueShopSlug,
-  slugFromShopName,
-} from '@/lib/shop-slug';
+import { ensureUniqueShopSlug, slugifyShopName } from '@/lib/shop-slug';
 
 export async function signUpAction(formData: FormData) {
   const cookieStore = await cookies();
@@ -72,7 +69,7 @@ export async function signUpAction(formData: FormData) {
       { cookies: { getAll() { return []; }, setAll() {} } }
     );
 
-    const baseSlug = slugFromShopName(rawShopName);
+    const baseSlug = slugifyShopName(rawShopName);
     const slug = await ensureUniqueShopSlug(
       supabaseAdmin,
       baseSlug,

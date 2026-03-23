@@ -8,7 +8,10 @@ import InstagramConnectButton from '@/components/InstagramConnectButton';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { getServerLocale } from '@/lib/locale-server';
 import { getMessage, type Locale } from '@/lib/translations';
-import { getShopAnalytics } from '@/lib/analytics-server';
+import {
+  getShopAnalytics,
+  reconcileDailyStatsForUser,
+} from '@/lib/analytics-server';
 import { getShopPublicUrls } from '@/lib/site-url';
 import { AnalyticsChart } from '@/components/AnalyticsChart';
 import { ShareSuccessCardDownload } from '@/components/ShareSuccessCard';
@@ -80,6 +83,8 @@ async function signOutUser() {
   redirect('/login');
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function UserDashboard(props: {
   searchParams: Promise<{ success?: string; error?: string; msg?: string }>;
 }) {
@@ -111,14 +116,34 @@ export default async function UserDashboard(props: {
     redirect('/login');
   }
 
-  // Récupération de la boutique
-  const { data: shop } = await supabase
+  // Récupération de la boutique (une ligne canonique si plusieurs existent)
+  const { data: shopsData, error: shopsFetchError } = await supabase
     .from('shops')
-    .select('id, name, slug, ig_access_token, ig_username')
+    .select(
+      'id, name, slug, ig_access_token, ig_username, whatsapp_number'
+    )
     .eq('user_id', user.id)
-    .maybeSingle();
+    .order('id', { ascending: false })
+    .limit(1);
 
-  const analytics = shop?.id ? await getShopAnalytics(shop.id) : null;
+  const shop = shopsData?.[0] ?? null;
+  console.log('Dashboard Shop Data:', shop);
+  if (shopsFetchError) {
+    console.error('Dashboard shops fetch error:', shopsFetchError.message);
+  }
+
+  if (
+    shop &&
+    (shop.whatsapp_number == null || String(shop.whatsapp_number).trim() === '')
+  ) {
+    redirect('/complete-profile');
+  }
+
+  let analytics: Awaited<ReturnType<typeof getShopAnalytics>> | null = null;
+  if (shop?.id) {
+    await reconcileDailyStatsForUser(user.id, shop.id);
+    analytics = await getShopAnalytics(shop.id);
+  }
 
   const weeklyVisitors =
     shop && analytics
@@ -172,7 +197,11 @@ export default async function UserDashboard(props: {
       <main className="flex-grow max-w-6xl w-full mx-auto py-12 px-6">
         <header className="mb-12">
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-            {getMessage(locale, 'user.hello')} {shop?.name || getMessage(locale, 'user.merchantFallback')} 👋
+            {getMessage(locale, 'user.hello')}{' '}
+            {shop == null
+              ? getMessage(locale, 'user.merchantFallback')
+              : shop.name ?? ''}{' '}
+            👋
           </h1>
           <p className="text-slate-500 mt-2 text-lg font-medium">{getMessage(locale, 'user.subtitle')}</p>
         </header>
@@ -216,7 +245,10 @@ export default async function UserDashboard(props: {
         )}
 
         {shop && analytics && (
-          <section className="mb-10 rounded-[2.5rem] border border-slate-200/80 bg-white p-8 md:p-10 shadow-sm">
+          <section
+            key={`analytics-${shop.id}`}
+            className="mb-10 rounded-[2.5rem] border border-slate-200/80 bg-white p-8 md:p-10 shadow-sm"
+          >
             <h2 className="text-[11px] uppercase tracking-[0.3em] text-slate-400 font-black mb-2">
               {getMessage(locale, 'user.sectionAnalytics')}
             </h2>
@@ -269,6 +301,7 @@ export default async function UserDashboard(props: {
               )}
             </div>
             <AnalyticsChart
+              key={`chart-${shop.id}`}
               data={analytics.last7Days}
               locale={locale}
               legend={{
@@ -294,7 +327,11 @@ export default async function UserDashboard(props: {
               <div className="space-y-8">
                 <div>
                   <p className="text-[10px] text-slate-400 uppercase font-black mb-2 tracking-widest">{getMessage(locale, 'user.shopNameLabel')}</p>
-                  <p className="text-2xl font-black text-slate-800">{shop?.name || getMessage(locale, 'user.shopPending')}</p>
+                  <p className="text-2xl font-black text-slate-800">
+                    {shop == null
+                      ? getMessage(locale, 'user.shopPending')
+                      : shop.name ?? ''}
+                  </p>
                 </div>
                 
                 <div>

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { publicSupabaseUrl } from '@/lib/env';
 
 /** Server-only client with the service role (bypasses RLS). Returns null if the key is missing. */
 export function createServiceRoleClient(): SupabaseClient | null {
@@ -7,7 +8,7 @@ export function createServiceRoleClient(): SupabaseClient | null {
     return null;
   }
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    publicSupabaseUrl(),
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { cookies: { getAll: () => [], setAll: () => {} } }
   );
