@@ -17,12 +17,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: m.title,
-    alternates: {
-      canonical: 'https://www.soukelhadagadir.com',
-    },
+    // alternates: {
+    //   canonical: 'https://www.soukelhadagadir.com',
+    // },
     description: m.description,
     metadataBase: new URL('https://www.soukelhadagadir.com'),
     keywords: [...m.keywords],
+    robots: {
+      index: true,
+      follow: true,
+    },
     openGraph: {
       title: m.ogTitle,
       description: m.ogDescription,
