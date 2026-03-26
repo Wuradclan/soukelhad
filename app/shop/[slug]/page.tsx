@@ -1,3 +1,5 @@
+import { Metadata } from 'next';
+import { createClient } from '@supabase/supabase-js'; // ضفنا هادي على قبل الـ Metadata
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -11,6 +13,61 @@ import { getDemoInstagramPhotos } from '@/lib/shop-demo-products';
 import ProductGrid from '@/components/ProductGrid';
 import { ShopVisitTracker } from '@/components/ShopVisitTracker';
 
+// هادي هي الدالة اللي كتقراها فيسبوك، واتساب، وجوجل باش تصاوب البطاقة ديال المشاركة
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await props.params;
+
+  // استعملنا createClient العادي حيت الـ Metadata كتحتاج غير البيانات العامة (Public) وما محتاجاش الـ Cookies
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const { data: shop } = await supabase
+    .from('shops')
+    .select('name, description, photo_url')
+    .eq('slug', slug)
+    .single();
+
+  if (!shop) {
+    return {
+      title: 'Shop Not Found | Souk El Had Agadir',
+      description: 'The shop you are looking for does not exist.',
+    };
+  }
+
+  const defaultImage = 'https://www.soukelhadagadir.com/default-preview.jpg'; // خاصك تزيد هاد التصويرة فـ public folder ديالك
+
+  return {
+    title: `${shop.name} | Souk El Had Agadir`,
+    description: shop.description || `Discover ${shop.name} inside Souk El Had, Agadir.`,
+    openGraph: {
+      title: shop.name,
+      description: shop.description || `Discover ${shop.name} inside Souk El Had, Agadir.`,
+      url: `https://www.soukelhadagadir.com/shop/${slug}`,
+      siteName: 'Souk El Had Agadir',
+      images: [
+        {
+          url: shop.photo_url || defaultImage,
+          width: 1200,
+          height: 630,
+          alt: `Cover image for ${shop.name}`,
+        },
+      ],
+      locale: 'ar_MA',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: shop.name,
+      description: shop.description || `Discover ${shop.name} inside Souk El Had, Agadir.`,
+      images: [shop.photo_url || defaultImage],
+    },
+  };
+}
+
+
+// الكود الأصلي ديالك كيبدا من هنا بلاما يتبدل فيه والو
 export default async function ShopPage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
   const locale = await getServerLocale();
