@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { createClient } from '@supabase/supabase-js'; // ضفنا هادي على قبل الـ Metadata
+import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -13,11 +13,10 @@ import { getDemoInstagramPhotos } from '@/lib/shop-demo-products';
 import ProductGrid from '@/components/ProductGrid';
 import { ShopVisitTracker } from '@/components/ShopVisitTracker';
 
-// هادي هي الدالة اللي كتقراها فيسبوك، واتساب، وجوجل باش تصاوب البطاقة ديال المشاركة
+// 1. GENERATE METADATA (SEO & OpenGraph)
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
 
-  // استعملنا createClient العادي حيت الـ Metadata كتحتاج غير البيانات العامة (Public) وما محتاجاش الـ Cookies
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -36,11 +35,14 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     };
   }
 
-  const defaultImage = 'https://www.soukelhadagadir.com/default-preview.jpg'; // خاصك تزيد هاد التصويرة فـ public folder ديالك
+  const defaultImage = 'https://www.soukelhadagadir.com/default-preview.jpg';
 
   return {
     title: `${shop.name} | Souk El Had Agadir`,
     description: shop.description || `Discover ${shop.name} inside Souk El Had, Agadir.`,
+    alternates: {
+      canonical: `/shop/${slug}`, // مهمة بزاف لجوجل باش يعرف الرابط الأصلي
+    },
     openGraph: {
       title: shop.name,
       description: shop.description || `Discover ${shop.name} inside Souk El Had, Agadir.`,
@@ -66,17 +68,21 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   };
 }
 
-
-// الكود الأصلي ديالك كيبدا من هنا بلاما يتبدل فيه والو
+// 2. MAIN PAGE COMPONENT
 export default async function ShopPage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
   const locale = await getServerLocale();
   const cookieStore = await cookies();
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll() { return cookieStore.getAll(); } } });
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, 
+    { cookies: { getAll() { return cookieStore.getAll(); } } }
+  );
 
   const { data: shop } = await supabase.from('shops').select('*').eq('slug', slug).single();
   if (!shop) return notFound();
 
+  // --- Instagram Logic ---
   let photos: any[] = [];
   let isDemoMode = false;
 
@@ -126,9 +132,40 @@ export default async function ShopPage(props: { params: Promise<{ slug: string }
     }
   }
 
+  // --- JSON-LD Schema Markup (SEO) ---
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": shop.name,
+    "description": shop.description || "Boutique au Souk El Had Agadir",
+    "image": shop.photo_url || "https://www.soukelhadagadir.com/default-preview.jpg",
+    "url": `https://www.soukelhadagadir.com/shop/${slug}`,
+    "telephone": shop.phone || "", 
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": `Box #${shop.box_number || '---'}, Souk El Had`,
+      "addressLocality": "Agadir",
+      "addressRegion": "Souss-Massa",
+      "addressCountry": "MA"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "30.4144",
+      "longitude": "-9.5843"
+    },
+    "areaServed": "Agadir",
+    "priceRange": "$$"
+  };
+
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
       
+      {/* Script JSON-LD مخفي كيقراه غير جوجل */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* 1. HEADER IDENTIQUE À LA LANDING PAGE */}
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -148,9 +185,8 @@ export default async function ShopPage(props: { params: Promise<{ slug: string }
       <main className="max-w-7xl mx-auto px-4 py-12 flex flex-col gap-16">
         <ShopVisitTracker shopId={shop.id} />
 
-        {/* 2. SECTION PROFIL COMMERÇANT (Style Cartes Landing) */}
+        {/* 2. SECTION PROFIL COMMERÇANT */}
         <section className="relative overflow-hidden bg-gray-50/50 border border-gray-100 rounded-[2.5rem] p-8 md:p-12 flex flex-col md:flex-row gap-12 items-center">
-            {/* Décoration en arrière-plan comme sur ta landing */}
             <div className="absolute top-0 end-0 w-64 h-64 bg-orange-100/30 rounded-full -translate-y-1/2 translate-x-1/2 rtl:-translate-x-1/2 blur-3xl" />
 
             {/* Photo du stand */}
@@ -190,7 +226,7 @@ export default async function ShopPage(props: { params: Promise<{ slug: string }
             </div>
         </section>
 
-        {/* 3. GRILLE DE PRODUITS (Le composant client) */}
+        {/* 3. GRILLE DE PRODUITS */}
         <div>
            <div className="text-center mb-12">
               <h2 className="text-3xl font-black mb-4">{getMessage(locale, 'shop.newArrivals')}</h2>
