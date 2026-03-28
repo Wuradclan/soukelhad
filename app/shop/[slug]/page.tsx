@@ -86,6 +86,7 @@ export default async function ShopPage({ params }: Props) {
     photos = getDemoInstagramPhotos(locale);
   } else {
     let graphToken = shop.ig_access_token as string;
+    let tokenRefreshPromise: Promise<string | null> = Promise.resolve(null);
     
     // Refresh Token if Service Role Key is available
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -94,39 +95,62 @@ export default async function ShopPage({ params }: Props) {
         process.env.SUPABASE_SERVICE_ROLE_KEY,
         { cookies: { getAll: () => [], setAll: () => {} } }
       );
-      const refreshed = await ensureInstagramAccessTokenFresh(
+      tokenRefreshPromise = ensureInstagramAccessTokenFresh(
         { id: shop.id, ig_access_token: shop.ig_access_token, ig_last_refreshed: shop.ig_last_refreshed },
         supabaseService
       );
-      if (refreshed) graphToken = refreshed;
     }
 
-    // --- INSTAGRAM SYNC: Fetch and Save Profile Picture ---
-    if (!currentPhotoUrl) {
-      try {
-        const userRes = await fetch(`https://graph.facebook.com/v19.0/${shop.ig_user_id}?fields=profile_picture_url&access_token=${graphToken}`);
-        const userData = await userRes.json();
-        if (userData.profile_picture_url) {
-          currentPhotoUrl = userData.profile_picture_url;
-          // Update DB - This requires the RLS Update Policy to be active
-          await supabase.from('shops').update({ photo_url: currentPhotoUrl }).eq('id', shop.id);
+    // Await token refresh to get the latest token before making other IG calls
+    const refreshedToken = await tokenRefreshPromise;
+    if (refreshedToken) graphToken = refreshedToken;
+
+    // Start fetching profile picture and media in parallel
+    const [profilePictureResult, mediaResult] = await Promise.all([
+      (async () => {
+        if (!currentPhotoUrl) {
+          try {
+            const userRes = await fetch(`https://graph.facebook.com/v19.0/${shop.ig_user_id}?fields=profile_picture_url&access_token=${graphToken}`);
+            const userData = await userRes.json();
+            if (userData.profile_picture_url) {
+              // Update DB in background, don't block the main render path
+              try {
+                const { error: updateError } = await supabase.from('shops').update({ photo_url: userData.profile_picture_url }).eq('id', shop.id);
+                if (updateError) {
+                  console.error('Failed to update shop photo_url:', updateError);
+                } else {
+                  console.log('Shop photo_url updated successfully.');
+                }
+              } catch (err) {
+                console.error('Failed to update shop photo_url (unexpected error):', err);
+              }
+              return userData.profile_picture_url;
+            }
+          } catch (err) {
+            console.error("IG Profile Picture Sync Error:", err);
+          }
         }
-      } catch (err) {
-        console.error("IG Sync Error:", err);
-      }
+        return null; // No new profile picture or error
+      })(),
+      (async () => {
+        try {
+          const mediaUrl = `https://graph.facebook.com/v19.0/${shop.ig_user_id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${graphToken}&limit=12`;
+          const res = await fetch(mediaUrl);
+          const json = await res.json();
+          return json.data;
+        } catch (err) {
+          console.error("IG Media Fetch Error:", err);
+          return null;
+        }
+      })(),
+    ]);
+
+    if (profilePictureResult) {
+      currentPhotoUrl = profilePictureResult;
     }
 
-    // Fetch Recent Media
-    try {
-      const mediaUrl = `https://graph.facebook.com/v19.0/${shop.ig_user_id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${graphToken}&limit=12`;
-      const res = await fetch(mediaUrl);
-      const json = await res.json();
-      photos = json.data || getDemoInstagramPhotos(locale);
-      if (!json.data) isDemoMode = true;
-    } catch {
-      isDemoMode = true;
-      photos = getDemoInstagramPhotos(locale);
-    }
+    photos = mediaResult || getDemoInstagramPhotos(locale);
+    if (!mediaResult) isDemoMode = true;
   }
 
   return (
@@ -151,7 +175,7 @@ export default async function ShopPage({ params }: Props) {
 
             <div className="w-full md:w-1/3 aspect-square relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-white">
               {currentPhotoUrl ? (
-                <Image src={currentPhotoUrl} alt={shop.name} fill className="object-cover" unoptimized />
+                <Image src={currentPhotoUrl} alt={shop.name} fill className="object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-orange-100">
                   <Store size={80} strokeWidth={1} />
