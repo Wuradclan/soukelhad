@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, Store, Clock, Award, Instagram, AlertCircle } from 'lucide-react';
+import { MapPin, Store as StoreIcon, Award, Instagram } from 'lucide-react';
 import { getServerLocale } from '@/lib/locale-server';
 import { getMessage } from '@/lib/translations';
 import { ensureInstagramAccessTokenFresh } from '@/lib/instagram-refresh';
@@ -16,7 +16,7 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// --- 1. GENERATE METADATA (SEO & WhatsApp/Social Previews) ---
+// --- 1. GÉNÉRATION DES MÉTADONNÉES (SEO & Réseaux Sociaux) ---
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   
@@ -33,25 +33,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       .eq('slug', slug)
       .single();
 
-    if (!shop) return { title: 'Shop Not Found' };
+    if (!shop) return { title: 'Boutique introuvable' };
 
-    // Use the photo_url if it exists in DB, otherwise a safe fallback
     const finalImage = shop.photo_url || 'https://www.soukelhadagadir.com/og-default.jpg';
 
     return {
       title: `${shop.name} | Souk El Had Agadir`,
-      description: shop.description || `Explore ${shop.name} at Souk El Had Agadir.`,
+      description: shop.description || `Découvrez la boutique ${shop.name} au Souk El Had d'Agadir.`,
       openGraph: {
         title: shop.name,
-        description: shop.description || `Discover ${shop.name} inside Souk El Had.`,
+        description: shop.description,
         url: `https://www.soukelhadagadir.com/shop/${slug}`,
         images: [{ url: finalImage, width: 1200, height: 630 }],
         type: 'website',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: shop.name,
-        images: [finalImage],
       },
     };
   } catch (e) {
@@ -59,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-// --- 2. MAIN PAGE COMPONENT ---
+// --- 2. COMPOSANT DE PAGE PRINCIPAL ---
 export default async function ShopPage({ params }: Props) {
   const { slug } = await params;
   const locale = await getServerLocale();
@@ -68,10 +62,10 @@ export default async function ShopPage({ params }: Props) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!, 
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, 
-    { cookies: { getAll() { return cookieStore.getAll(); } } }
+    { cookies: { getAll: () => cookieStore.getAll() } }
   );
 
-  // Fetch shop data from Supabase
+  // Récupération des données de la boutique
   const { data: shop } = await supabase.from('shops').select('*').eq('slug', slug).single();
   if (!shop) return notFound();
 
@@ -79,6 +73,7 @@ export default async function ShopPage({ params }: Props) {
   let isDemoMode = false;
   let currentPhotoUrl = shop.photo_url;
 
+  // --- LOGIQUE INSTAGRAM (TOKEN REFRESH & FETCH) ---
   const hasInstagram = Boolean(shop.ig_access_token && shop.ig_user_id);
 
   if (!hasInstagram) {
@@ -86,26 +81,20 @@ export default async function ShopPage({ params }: Props) {
     photos = getDemoInstagramPhotos(locale);
   } else {
     let graphToken = shop.ig_access_token as string;
-    let tokenRefreshPromise: Promise<string | null> = Promise.resolve(null);
     
-    // Refresh Token if Service Role Key is available
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const supabaseService = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY,
         { cookies: { getAll: () => [], setAll: () => {} } }
       );
-      tokenRefreshPromise = ensureInstagramAccessTokenFresh(
+      const refreshedToken = await ensureInstagramAccessTokenFresh(
         { id: shop.id, ig_access_token: shop.ig_access_token, ig_last_refreshed: shop.ig_last_refreshed },
         supabaseService
       );
+      if (refreshedToken) graphToken = refreshedToken;
     }
 
-    // Await token refresh to get the latest token before making other IG calls
-    const refreshedToken = await tokenRefreshPromise;
-    if (refreshedToken) graphToken = refreshedToken;
-
-    // Start fetching profile picture and media in parallel
     const [profilePictureResult, mediaResult] = await Promise.all([
       (async () => {
         if (!currentPhotoUrl) {
@@ -113,48 +102,64 @@ export default async function ShopPage({ params }: Props) {
             const userRes = await fetch(`https://graph.facebook.com/v19.0/${shop.ig_user_id}?fields=profile_picture_url&access_token=${graphToken}`);
             const userData = await userRes.json();
             if (userData.profile_picture_url) {
-              // Update DB in background, don't block the main render path
-              try {
-                const { error: updateError } = await supabase.from('shops').update({ photo_url: userData.profile_picture_url }).eq('id', shop.id);
-                if (updateError) {
-                  console.error('Failed to update shop photo_url:', updateError);
-                } else {
-                  console.log('Shop photo_url updated successfully.');
-                }
-              } catch (err) {
-                console.error('Failed to update shop photo_url (unexpected error):', err);
-              }
-              return userData.profile_picture_url;
+                await supabase.from('shops').update({ photo_url: userData.profile_picture_url }).eq('id', shop.id);
+                return userData.profile_picture_url;
             }
-          } catch (err) {
-            console.error("IG Profile Picture Sync Error:", err);
-          }
+          } catch (err) { console.error("IG Profile Error:", err); }
         }
-        return null; // No new profile picture or error
+        return null;
       })(),
       (async () => {
         try {
-          const mediaUrl = `https://graph.facebook.com/v19.0/${shop.ig_user_id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${graphToken}&limit=12`;
-          const res = await fetch(mediaUrl);
+          const res = await fetch(`https://graph.facebook.com/v19.0/${shop.ig_user_id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${graphToken}&limit=12`);
           const json = await res.json();
           return json.data;
-        } catch (err) {
-          console.error("IG Media Fetch Error:", err);
-          return null;
-        }
+        } catch (err) { return null; }
       })(),
     ]);
 
-    if (profilePictureResult) {
-      currentPhotoUrl = profilePictureResult;
-    }
-
+    if (profilePictureResult) currentPhotoUrl = profilePictureResult;
     photos = mediaResult || getDemoInstagramPhotos(locale);
     if (!mediaResult) isDemoMode = true;
   }
 
+  // --- 3. DONNÉES STRUCTURÉES (JSON-LD) ---
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Store",
+    "name": shop.name,
+    "description": shop.description || `Boutique artisanale située au Souk El Had d'Agadir.`,
+    "image": currentPhotoUrl || 'https://www.soukelhadagadir.com/og-default.jpg',
+    "url": `https://www.soukelhadagadir.com/shop/${slug}`,
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": `Carré #${shop.box_number || "Non spécifié"}, Souk El Had`,
+      "addressLocality": "Agadir",
+      "addressRegion": "Souss-Massa",
+      "postalCode": "80000",
+      "addressCountry": "MA"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "30.4131",
+      "longitude": "-9.5771"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      "opens": "09:00",
+      "closes": "20:00"
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
+      {/* Script JSON-LD injecté pour Google Search Console */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
@@ -169,16 +174,16 @@ export default async function ShopPage({ params }: Props) {
       <main className="max-w-7xl mx-auto px-4 py-12 flex flex-col gap-16">
         <ShopVisitTracker shopId={shop.id} />
 
-        {/* PROFILE CARD */}
+        {/* CARTE DE PROFIL "LUXY" */}
         <section className="relative overflow-hidden bg-gray-50/50 border border-gray-100 rounded-[2.5rem] p-8 md:p-12 flex flex-col md:flex-row gap-12 items-center">
             <div className="absolute top-0 end-0 w-64 h-64 bg-orange-100/30 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
 
             <div className="w-full md:w-1/3 aspect-square relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-white">
               {currentPhotoUrl ? (
-                <Image src={currentPhotoUrl} alt={shop.name} fill className="object-cover" />
+                <Image src={currentPhotoUrl} alt={shop.name} fill className="object-cover" priority />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-orange-100">
-                  <Store size={80} strokeWidth={1} />
+                  <StoreIcon size={80} strokeWidth={1} />
                 </div>
               )}
             </div>
@@ -198,7 +203,7 @@ export default async function ShopPage({ params }: Props) {
                         <MapPin size={16} /> Carré #{shop.box_number || "---"}
                     </span>
                     {shop.ig_username && (
-                      <a href={`https://instagram.com/${shop.ig_username}`} target="_blank" className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm hover:text-pink-600 transition-colors">
+                      <a href={`https://instagram.com/${shop.ig_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm hover:text-pink-600 transition-colors">
                         <Instagram size={16} /> @{shop.ig_username}
                       </a>
                     )}
@@ -210,7 +215,7 @@ export default async function ShopPage({ params }: Props) {
             </div>
         </section>
 
-        {/* PRODUCTS */}
+        {/* GRILLE DE PRODUITS */}
         <div>
            <div className="text-center mb-12">
               <h2 className="text-3xl font-black mb-4 uppercase italic">{getMessage(locale, 'shop.newArrivals')}</h2>
